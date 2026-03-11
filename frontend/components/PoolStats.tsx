@@ -31,8 +31,8 @@ export default function PoolStats() {
       const poolStats = await contractService.getPoolStats();
       setStats(poolStats);
       
-      const yield = await contractService.calculateYield(wallet.address);
-      setUserYield(ethers.formatEther(yield));
+      const userYieldAmount = await contractService.calculateYield(wallet.address);
+      setUserYield(ethers.formatEther(userYieldAmount));
       
       // Note: Would need to add getLenderDeposit to contract service
       // For now, showing 0

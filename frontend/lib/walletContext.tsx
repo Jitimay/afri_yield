@@ -38,6 +38,41 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       }
 
       const provider = new ethers.BrowserProvider(window.ethereum);
+      
+      // Check if we're on the correct network
+      const network = await provider.getNetwork();
+      const expectedChainId = 1287; // Moonbase Alpha
+      
+      if (network.chainId !== BigInt(expectedChainId)) {
+        // Try to switch to Moonbase Alpha
+        try {
+          await window.ethereum.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: '0x507' }], // 1287 in hex
+          });
+        } catch (switchError: any) {
+          // If network doesn't exist, add it
+          if (switchError.code === 4902) {
+            await window.ethereum.request({
+              method: 'wallet_addEthereumChain',
+              params: [{
+                chainId: '0x507',
+                chainName: 'Moonbase Alpha',
+                nativeCurrency: {
+                  name: 'DEV',
+                  symbol: 'DEV',
+                  decimals: 18,
+                },
+                rpcUrls: ['https://rpc.api.moonbase.moonbeam.network'],
+                blockExplorerUrls: ['https://moonbase.moonscan.io/'],
+              }],
+            });
+          } else {
+            throw new Error('Please switch to Moonbase Alpha network');
+          }
+        }
+      }
+
       const accounts = await provider.send('eth_requestAccounts', []);
       
       if (accounts.length === 0) {
@@ -74,7 +109,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     try {
       if (!wallet.address && !window.ethereum) return;
 
-      const provider = new ethers.BrowserProvider(window.ethereum);
+      const provider = new ethers.BrowserProvider(window.ethereum!);
       const signer = await provider.getSigner();
       const address = await signer.getAddress();
 
@@ -127,9 +162,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         }
       };
 
-      window.ethereum.on('accountsChanged', handleAccountsChanged);
+      window.ethereum?.on('accountsChanged', handleAccountsChanged);
       return () => {
-        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+        window.ethereum?.removeListener('accountsChanged', handleAccountsChanged);
       };
     }
   }, []);

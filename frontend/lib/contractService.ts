@@ -61,6 +61,12 @@ export class ContractService {
   }
 
   async initialize() {
+    // Verify we're on Moonbase Alpha
+    const network = await this.provider.getNetwork();
+    if (network.chainId !== BigInt(1287)) {
+      throw new Error('Please switch to Moonbase Alpha network (Chain ID: 1287)');
+    }
+    
     this.signer = await this.provider.getSigner();
     
     const lendingPoolAddress = process.env.NEXT_PUBLIC_LENDING_POOL_ADDRESS;
