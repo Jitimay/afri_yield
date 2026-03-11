@@ -61,38 +61,50 @@ export class ContractService {
   }
 
   async initialize() {
-    // Verify we're on Moonbase Alpha
-    const network = await this.provider.getNetwork();
-    if (network.chainId !== BigInt(1287)) {
-      throw new Error('Please switch to Moonbase Alpha network (Chain ID: 1287)');
-    }
-    
-    this.signer = await this.provider.getSigner();
-    
-    const lendingPoolAddress = process.env.NEXT_PUBLIC_LENDING_POOL_ADDRESS;
-    const stablecoinAddress = process.env.NEXT_PUBLIC_STABLECOIN_ADDRESS;
-    const oracleAddress = process.env.NEXT_PUBLIC_ORACLE_ADDRESS;
+    try {
+      // Verify we're on Moonbase Alpha
+      const network = await this.provider.getNetwork();
+      if (network.chainId !== BigInt(1287)) {
+        throw new Error('Please switch to Moonbase Alpha network (Chain ID: 1287)');
+      }
+      
+      this.signer = await this.provider.getSigner();
+      
+      const lendingPoolAddress = process.env.NEXT_PUBLIC_LENDING_POOL_ADDRESS;
+      const stablecoinAddress = process.env.NEXT_PUBLIC_STABLECOIN_ADDRESS;
+      const oracleAddress = process.env.NEXT_PUBLIC_ORACLE_ADDRESS;
 
-    if (!lendingPoolAddress || !stablecoinAddress || !oracleAddress) {
-      throw new Error('Contract addresses not configured');
-    }
+      if (!lendingPoolAddress || !stablecoinAddress || !oracleAddress) {
+        throw new Error('Contract addresses not configured');
+      }
 
-    this.lendingPool = new ethers.Contract(lendingPoolAddress, LENDING_POOL_ABI, this.signer);
-    this.stablecoin = new ethers.Contract(stablecoinAddress, STABLECOIN_ABI, this.signer);
-    this.oracle = new ethers.Contract(oracleAddress, ORACLE_ABI, this.signer);
+      this.lendingPool = new ethers.Contract(lendingPoolAddress, LENDING_POOL_ABI, this.signer);
+      this.stablecoin = new ethers.Contract(stablecoinAddress, STABLECOIN_ABI, this.signer);
+      this.oracle = new ethers.Contract(oracleAddress, ORACLE_ABI, this.signer);
+    } catch (error: any) {
+      if (error.code === 'NETWORK_ERROR') throw new Error('Network connection failed');
+      if (error.code === 'UNSUPPORTED_OPERATION') throw new Error('Wallet not connected');
+      throw error;
+    }
   }
 
   // Deposit and withdrawal methods
   async depositFunds(amount: bigint): Promise<ethers.ContractTransactionResponse> {
     if (!this.stablecoin || !this.lendingPool) throw new Error('Contracts not initialized');
     
-    // Approve spending
-    const approveTx = await this.stablecoin.approve(await this.lendingPool.getAddress(), amount);
-    await approveTx.wait();
-    
-    // Deposit
-    const depositTx = await this.lendingPool.depositLenderFunds(amount);
-    return depositTx;
+    try {
+      // Approve spending
+      const approveTx = await this.stablecoin.approve(await this.lendingPool.getAddress(), amount);
+      await approveTx.wait();
+      
+      // Deposit
+      const depositTx = await this.lendingPool.depositLenderFunds(amount);
+      return depositTx;
+    } catch (error: any) {
+      if (error.code === 'ACTION_REJECTED') throw new Error('Transaction rejected by user');
+      if (error.message?.includes('insufficient')) throw new Error('Insufficient balance');
+      throw new Error(`Deposit failed: ${error.message}`);
+    }
   }
 
   async withdrawFunds(amount: bigint): Promise<ethers.ContractTransactionResponse> {
@@ -103,7 +115,16 @@ export class ContractService {
   // Loan methods
   async requestLoan(amount: bigint, riskScore: number): Promise<ethers.ContractTransactionResponse> {
     if (!this.lendingPool) throw new Error('Contracts not initialized');
-    return await this.lendingPool.requestLoan(amount, riskScore);
+    
+    try {
+      return await this.lendingPool.requestLoan(amount, riskScore);
+    } catch (error: any) {
+      if (error.code === 'ACTION_REJECTED') throw new Error('Transaction rejected by user');
+      if (error.message?.includes('Risk score too low')) throw new Error('Risk score must be ≥70');
+      if (error.message?.includes('Insufficient liquidity')) throw new Error('Not enough funds in pool');
+      if (error.message?.includes('Loan amount')) throw new Error('Amount must be 50-500 AUSD');
+      throw new Error(`Loan request failed: ${error.message}`);
+    }
   }
 
   async repayLoan(loanId: number): Promise<ethers.ContractTransactionResponse> {

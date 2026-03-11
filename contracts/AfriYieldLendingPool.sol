@@ -57,6 +57,12 @@ contract AfriYieldLendingPool is ReentrancyGuard, Ownable {
         require(amount >= 50e18 && amount <= 500e18, "Loan amount must be 50-500 AUSD");
         require(riskScore >= MIN_RISK_SCORE, "Risk score too low");
         require(stablecoin.balanceOf(address(this)) >= amount, "Insufficient liquidity");
+        
+        // Check if borrower has active loans
+        uint256[] memory borrowerLoanIds = borrowerLoans[msg.sender];
+        for (uint256 i = 0; i < borrowerLoanIds.length; i++) {
+            require(!loans[borrowerLoanIds[i]].isActive, "Active loan exists");
+        }
 
         uint256 loanId = nextLoanId++;
         loans[loanId] = Loan({
@@ -80,6 +86,7 @@ contract AfriYieldLendingPool is ReentrancyGuard, Ownable {
         Loan storage loan = loans[loanId];
         require(loan.borrower == msg.sender, "Not loan borrower");
         require(loan.isActive && !loan.isRepaid, "Loan not active");
+        require(block.timestamp <= loan.dueDate, "Loan overdue");
 
         stablecoin.safeTransferFrom(msg.sender, address(this), loan.amount);
         
