@@ -15,7 +15,7 @@ export default function PoolStats() {
   useEffect(() => {
     if (wallet.isConnected) {
       loadStats();
-      const interval = setInterval(loadStats, 10000); // Update every 10s
+      const interval = setInterval(loadStats, 3000); // Update every 3s
       return () => clearInterval(interval);
     }
   }, [wallet.isConnected, wallet.address]);
