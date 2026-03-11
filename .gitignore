@@ -2,9 +2,25 @@
 node_modules/
 frontend/node_modules/
 
-# Environment variables
+# Environment variables (CRITICAL - contains private keys)
 .env
 .env.local
+.env.production
+.env.staging
+frontend/.env
+frontend/.env.local
+frontend/.env.production
+
+# Private keys and secrets
+*.key
+*.pem
+private-keys/
+secrets/
+wallet-keys/
+
+# Deployment artifacts (contains contract addresses)
+deployments.json
+deployment-addresses.json
 
 # Hardhat files
 cache/
@@ -18,6 +34,8 @@ coverage.json
 # Build outputs
 dist/
 build/
+.next/
+out/
 
 # IDE
 .vscode/
@@ -36,5 +54,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Deployment
-deployments.json
+# Temporary files
+tmp/
+temp/
