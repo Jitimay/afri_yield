@@ -13,7 +13,10 @@ export default function FarmDataForm({ onAssessment }: Props) {
     estimatedYield: 50,
     soilQuality: 50,
     rainfall: 1000,
-    marketVolatility: 30
+    marketVolatility: 30,
+    farmSize: 1,
+    yearsExperience: 1,
+    previousLoans: 0
   });
 
   const [errors, setErrors] = useState<Partial<Record<keyof FarmData, string>>>({});
@@ -58,7 +61,10 @@ export default function FarmDataForm({ onAssessment }: Props) {
       estimatedYield: 75,
       soilQuality: 80,
       rainfall: 1200,
-      marketVolatility: 30
+      marketVolatility: 30,
+      farmSize: 2,
+      yearsExperience: 5,
+      previousLoans: 1
     };
     setFormData(demoData);
     setIsDemoMode(true);
