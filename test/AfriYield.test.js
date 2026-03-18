@@ -29,7 +29,7 @@ describe("AfriYield Platform", function () {
     await stablecoin.connect(lender).approve(await lendingPool.getAddress(), depositAmount);
     await lendingPool.connect(lender).depositLenderFunds(depositAmount);
     
-    expect(await lendingPool.lenderDeposits(lender.address)).to.equal(depositAmount);
+    expect(await lendingPool.lenderDeposits(lender.address)).to.equal(ethers.parseEther("950")); // After 5% insurance
   });
 
   it("Should allow farmer to request loan with good risk score", async function () {
@@ -56,7 +56,7 @@ describe("AfriYield Platform", function () {
     
     await expect(
       lendingPool.connect(farmer).requestLoan(loanAmount, lowRiskScore)
-    ).to.be.revertedWith("Risk score too low");
+    ).to.be.revertedWith("Risk score below threshold");
   });
 
   it("Should allow loan repayment", async function () {
@@ -75,5 +75,37 @@ describe("AfriYield Platform", function () {
     const loan = await lendingPool.getLoanDetails(1);
     expect(loan.isRepaid).to.be.true;
     expect(loan.isActive).to.be.false;
+  });
+
+  it("Should handle insurance pool correctly", async function () {
+    const depositAmount = ethers.parseEther("1000");
+    await stablecoin.connect(lender).approve(await lendingPool.getAddress(), depositAmount);
+    await lendingPool.connect(lender).depositLenderFunds(depositAmount);
+    
+    const stats = await lendingPool.getPoolStats();
+    expect(stats._totalDeposits).to.equal(ethers.parseEther("950")); // 95% after insurance
+  });
+
+  it("Should reject invalid loan amounts", async function () {
+    await expect(
+      lendingPool.connect(farmer).requestLoan(ethers.parseEther("30"), 80)
+    ).to.be.revertedWith("Invalid loan amount");
+    
+    await expect(
+      lendingPool.connect(farmer).requestLoan(ethers.parseEther("600"), 80)
+    ).to.be.revertedWith("Invalid loan amount");
+  });
+
+  it("Should calculate yield correctly", async function () {
+    const depositAmount = ethers.parseEther("1000");
+    await stablecoin.connect(lender).approve(await lendingPool.getAddress(), depositAmount);
+    await lendingPool.connect(lender).depositLenderFunds(depositAmount);
+    
+    // Fast forward time
+    await ethers.provider.send("evm_increaseTime", [365 * 24 * 60 * 60]); // 1 year
+    await ethers.provider.send("evm_mine");
+    
+    const yield = await lendingPool.calculateYield(lender.address);
+    expect(yield).to.be.gt(0);
   });
 });

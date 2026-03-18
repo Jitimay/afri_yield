@@ -36,18 +36,76 @@ export function normalizeRainfall(rainfall: number): number {
  * Calculate risk score from farm data
  * Formula: (yield × 0.4) + (soil × 0.3) + (rainfall × 0.2) - (volatility × 0.1)
  */
-export function calculateRiskScore(data: FarmData): RiskAssessment {
-  // Normalize rainfall
+export interface FarmData {
+  cropType: CropType;
+  estimatedYield: number;
+  soilQuality: number;
+  rainfall: number;
+  marketVolatility: number;
+  farmSize: number;
+  yearsExperience: number;
+  previousLoans: number;
+}
+
+export interface MLWeights {
+  yield: number;
+  soil: number;
+  rainfall: number;
+  volatility: number;
+  size: number;
+  experience: number;
+  history: number;
+}
+
+const CROP_MULTIPLIERS: Record<CropType, number> = {
+  'Coffee': 1.2,
+  'Tea': 1.1,
+  'Maize': 1.0,
+  'Beans': 0.9,
+  'Cassava': 0.8
+};
+
+export function calculateMLRiskScore(data: FarmData): RiskAssessment {
+  const weights: MLWeights = {
+    yield: 0.25,
+    soil: 0.20,
+    rainfall: 0.15,
+    volatility: -0.10,
+    size: 0.15,
+    experience: 0.10,
+    history: 0.15
+  };
+  
   const rainfallScore = normalizeRainfall(data.rainfall);
+  const cropMultiplier = CROP_MULTIPLIERS[data.cropType];
+  const sizeScore = Math.min(data.farmSize * 10, 100);
+  const experienceScore = Math.min(data.yearsExperience * 5, 100);
+  const historyScore = data.previousLoans > 0 ? Math.min(data.previousLoans * 20, 100) : 50;
   
-  // Calculate weighted components
-  const yieldContribution = data.estimatedYield * 0.4;
-  const soilContribution = data.soilQuality * 0.3;
-  const rainfallContribution = rainfallScore * 0.2;
-  const volatilityPenalty = data.marketVolatility * 0.1;
+  const rawScore = (
+    data.estimatedYield * weights.yield +
+    data.soilQuality * weights.soil +
+    rainfallScore * weights.rainfall +
+    data.marketVolatility * weights.volatility +
+    sizeScore * weights.size +
+    experienceScore * weights.experience +
+    historyScore * weights.history
+  ) * cropMultiplier;
   
-  // Calculate final score
-  const rawScore = yieldContribution + soilContribution + rainfallContribution - volatilityPenalty;
+  const score = Math.max(0, Math.min(100, rawScore));
+  
+  return {
+    score,
+    isEligible: score >= 70,
+    breakdown: {
+      yieldContribution: data.estimatedYield * weights.yield,
+      soilContribution: data.soilQuality * weights.soil,
+      rainfallContribution: rainfallScore * weights.rainfall,
+      volatilityPenalty: Math.abs(data.marketVolatility * weights.volatility)
+    },
+    recommendation: score >= 70 ? "Eligible for loan" : "Improve farm metrics"
+  };
+}
   const finalScore = Math.max(0, Math.min(100, rawScore));
   
   // Determine eligibility
