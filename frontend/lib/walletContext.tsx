@@ -41,14 +41,14 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       
       // Check if we're on the correct network
       const network = await provider.getNetwork();
-      const expectedChainId = 1287; // Moonbase Alpha
+      const expectedChainId = 420420420; // Polkadot Hub
       
       if (network.chainId !== BigInt(expectedChainId)) {
-        // Try to switch to Moonbase Alpha
+        // Try to switch to Polkadot Hub
         try {
           await window.ethereum.request({
             method: 'wallet_switchEthereumChain',
-            params: [{ chainId: '0x507' }], // 1287 in hex
+            params: [{ chainId: '0x190F6E14' }], // 420420420 in hex
           });
         } catch (switchError: any) {
           // If network doesn't exist, add it
@@ -56,19 +56,19 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
             await window.ethereum.request({
               method: 'wallet_addEthereumChain',
               params: [{
-                chainId: '0x507',
-                chainName: 'Moonbase Alpha',
+                chainId: '0x190F6E14',
+                chainName: 'Polkadot Hub',
                 nativeCurrency: {
-                  name: 'DEV',
-                  symbol: 'DEV',
+                  name: 'DOT',
+                  symbol: 'DOT',
                   decimals: 18,
                 },
-                rpcUrls: ['https://rpc.api.moonbase.moonbeam.network'],
-                blockExplorerUrls: ['https://moonbase.moonscan.io/'],
+                rpcUrls: ['https://polkadot-hub-rpc.polkadot.io'],
+                blockExplorerUrls: ['https://polkadot-hub.subscan.io'],
               }],
             });
           } else {
-            throw new Error('Please switch to Moonbase Alpha network');
+            throw new Error('Please switch to Polkadot Hub network');
           }
         }
       }
@@ -113,7 +113,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const signer = await provider.getSigner();
       const address = await signer.getAddress();
 
-      // Get native balance (DEV tokens)
+      // Get native balance (DOT tokens)
       const nativeBalance = await provider.getBalance(address);
       const nativeFormatted = ethers.formatEther(nativeBalance);
 

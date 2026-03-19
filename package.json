@@ -9,6 +9,7 @@
     "compile": "hardhat compile",
     "deploy:local": "hardhat run scripts/deploy.js --network hardhat",
     "deploy:moonbase": "hardhat run scripts/deploy.js --network moonbaseAlpha",
+    "deploy:polkadot": "hardhat run scripts/deploy.js --network polkadotHub",
     "dev:frontend": "cd frontend && npm run dev",
     "build:frontend": "cd frontend && npm run build"
   },

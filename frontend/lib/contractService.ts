@@ -51,6 +51,7 @@ export class ContractService {
   private lendingPool: ethers.Contract | null = null;
   private stablecoin: ethers.Contract | null = null;
   private oracle: ethers.Contract | null = null;
+  private readonly POLKADOT_HUB_CHAIN_ID = BigInt(420420420);
 
   constructor() {
     if (typeof window !== 'undefined' && window.ethereum) {
@@ -60,13 +61,26 @@ export class ContractService {
     }
   }
 
+  private async verifyNetwork(): Promise<void> {
+    const network = await this.provider.getNetwork();
+    if (network.chainId !== this.POLKADOT_HUB_CHAIN_ID) {
+      throw new Error(
+        `Wrong network detected. Please switch to Polkadot Hub.\n` +
+        `Expected Chain ID: ${this.POLKADOT_HUB_CHAIN_ID}\n` +
+        `Current Chain ID: ${network.chainId}\n\n` +
+        `To add Polkadot Hub to your wallet:\n` +
+        `- Network Name: Polkadot Hub\n` +
+        `- RPC URL: ${process.env.NEXT_PUBLIC_RPC_URL || 'https://polkadot-hub-rpc.polkadot.io'}\n` +
+        `- Chain ID: 420420420\n` +
+        `- Currency Symbol: DOT`
+      );
+    }
+  }
+
   async initialize() {
     try {
-      // Verify we're on Moonbase Alpha
-      const network = await this.provider.getNetwork();
-      if (network.chainId !== BigInt(1287)) {
-        throw new Error('Please switch to Moonbase Alpha network (Chain ID: 1287)');
-      }
+      // Verify we're on Polkadot Hub
+      await this.verifyNetwork();
       
       this.signer = await this.provider.getSigner();
       
@@ -75,21 +89,27 @@ export class ContractService {
       const oracleAddress = process.env.NEXT_PUBLIC_ORACLE_ADDRESS;
 
       if (!lendingPoolAddress || !stablecoinAddress || !oracleAddress) {
-        throw new Error('Contract addresses not configured');
+        throw new Error(
+          'Contract addresses not configured. Please ensure the contracts are deployed to Polkadot Hub and the environment variables are set:\n' +
+          '- NEXT_PUBLIC_LENDING_POOL_ADDRESS\n' +
+          '- NEXT_PUBLIC_STABLECOIN_ADDRESS\n' +
+          '- NEXT_PUBLIC_ORACLE_ADDRESS'
+        );
       }
 
       this.lendingPool = new ethers.Contract(lendingPoolAddress, LENDING_POOL_ABI, this.signer);
       this.stablecoin = new ethers.Contract(stablecoinAddress, STABLECOIN_ABI, this.signer);
       this.oracle = new ethers.Contract(oracleAddress, ORACLE_ABI, this.signer);
     } catch (error: any) {
-      if (error.code === 'NETWORK_ERROR') throw new Error('Network connection failed');
-      if (error.code === 'UNSUPPORTED_OPERATION') throw new Error('Wallet not connected');
+      if (error.code === 'NETWORK_ERROR') throw new Error('Network connection failed. Please check your internet connection and RPC endpoint.');
+      if (error.code === 'UNSUPPORTED_OPERATION') throw new Error('Wallet not connected. Please connect your wallet to continue.');
       throw error;
     }
   }
 
   // Deposit and withdrawal methods
   async depositFunds(amount: bigint): Promise<ethers.ContractTransactionResponse> {
+    await this.verifyNetwork();
     if (!this.stablecoin || !this.lendingPool) throw new Error('Contracts not initialized');
     
     try {
@@ -108,12 +128,14 @@ export class ContractService {
   }
 
   async withdrawFunds(amount: bigint): Promise<ethers.ContractTransactionResponse> {
+    await this.verifyNetwork();
     if (!this.lendingPool) throw new Error('Contracts not initialized');
     return await this.lendingPool.withdrawFunds(amount);
   }
 
   // Loan methods
   async requestLoan(amount: bigint, riskScore: number): Promise<ethers.ContractTransactionResponse> {
+    await this.verifyNetwork();
     if (!this.lendingPool) throw new Error('Contracts not initialized');
     
     try {
@@ -128,6 +150,7 @@ export class ContractService {
   }
 
   async repayLoan(loanId: number): Promise<ethers.ContractTransactionResponse> {
+    await this.verifyNetwork();
     if (!this.stablecoin || !this.lendingPool) throw new Error('Contracts not initialized');
     
     // Get loan details to know amount
@@ -194,6 +217,7 @@ export class ContractService {
   }
 
   async mintStablecoin(amount: bigint): Promise<ethers.ContractTransactionResponse> {
+    await this.verifyNetwork();
     if (!this.stablecoin || !this.signer) throw new Error('Contracts not initialized');
     const address = await this.signer.getAddress();
     return await this.stablecoin.mint(address, amount);

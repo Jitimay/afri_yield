@@ -13,7 +13,7 @@ async function main() {
   const stablecoinAddress = await stablecoin.getAddress();
   console.log("MockStablecoin deployed to:", stablecoinAddress);
 
-  // Deploy DecentralizedOracle (enhanced version)
+  // Deploy DecentralizedOracle
   console.log("\n2. Deploying DecentralizedOracle...");
   const DecentralizedOracle = await hre.ethers.getContractFactory("DecentralizedOracle");
   const oracle = await DecentralizedOracle.deploy();
@@ -21,13 +21,46 @@ async function main() {
   const oracleAddress = await oracle.getAddress();
   console.log("DecentralizedOracle deployed to:", oracleAddress);
 
-  // Deploy AfriYieldLendingPool (enhanced version)
-  console.log("\n3. Deploying AfriYieldLendingPool...");
+  // Deploy RiskCalculator
+  console.log("\n3. Deploying RiskCalculator...");
+  const RiskCalculator = await hre.ethers.getContractFactory("RiskCalculator");
+  const riskCalculator = await RiskCalculator.deploy();
+  await riskCalculator.waitForDeployment();
+  const riskCalculatorAddress = await riskCalculator.getAddress();
+  console.log("RiskCalculator deployed to:", riskCalculatorAddress);
+
+  // Deploy AfriYieldLendingPool
+  console.log("\n4. Deploying AfriYieldLendingPool...");
   const AfriYieldLendingPool = await hre.ethers.getContractFactory("AfriYieldLendingPool");
-  const lendingPool = await AfriYieldLendingPool.deploy(stablecoinAddress);
+  const lendingPool = await AfriYieldLendingPool.deploy(
+    stablecoinAddress,
+    oracleAddress,
+    riskCalculatorAddress
+  );
   await lendingPool.waitForDeployment();
   const lendingPoolAddress = await lendingPool.getAddress();
   console.log("AfriYieldLendingPool deployed to:", lendingPoolAddress);
+
+  // Deploy XCMBridge
+  console.log("\n5. Deploying XCMBridge...");
+  const XCMBridge = await hre.ethers.getContractFactory("XCMBridge");
+  const xcmBridge = await XCMBridge.deploy(lendingPoolAddress);
+  await xcmBridge.waitForDeployment();
+  const xcmBridgeAddress = await xcmBridge.getAddress();
+  console.log("XCMBridge deployed to:", xcmBridgeAddress);
+
+  // Deploy AfriYieldGovernance
+  console.log("\n6. Deploying AfriYieldGovernance...");
+  const AfriYieldGovernance = await hre.ethers.getContractFactory("AfriYieldGovernance");
+  const governance = await AfriYieldGovernance.deploy(lendingPoolAddress);
+  await governance.waitForDeployment();
+  const governanceAddress = await governance.getAddress();
+  console.log("AfriYieldGovernance deployed to:", governanceAddress);
+
+  // Set up contract connections
+  console.log("\n7. Setting up contract connections...");
+  await lendingPool.setXCMBridge(xcmBridgeAddress);
+  console.log("✓ XCM Bridge connected to Lending Pool");
 
   // Save deployment addresses
   const deployments = {
@@ -36,7 +69,10 @@ async function main() {
     contracts: {
       MockStablecoin: stablecoinAddress,
       DecentralizedOracle: oracleAddress,
-      AfriYieldLendingPool: lendingPoolAddress
+      RiskCalculator: riskCalculatorAddress,
+      AfriYieldLendingPool: lendingPoolAddress,
+      XCMBridge: xcmBridgeAddress,
+      AfriYieldGovernance: governanceAddress
     },
     timestamp: new Date().toISOString()
   };
@@ -49,17 +85,20 @@ async function main() {
   console.log("\n📋 Deployment Summary:");
   console.log("========================");
   console.log("Network:", hre.network.name);
-  console.log("Chain ID:", hre.network.config.chainId);
   console.log("MockStablecoin:", stablecoinAddress);
   console.log("DecentralizedOracle:", oracleAddress);
+  console.log("RiskCalculator:", riskCalculatorAddress);
   console.log("AfriYieldLendingPool:", lendingPoolAddress);
+  console.log("XCMBridge:", xcmBridgeAddress);
+  console.log("AfriYieldGovernance:", governanceAddress);
   console.log("========================\n");
 
   console.log("🎉 Deployment complete!");
   console.log("\nNext steps:");
   console.log("1. Update frontend/.env with these contract addresses");
-  console.log("2. Verify contracts on block explorer (if on testnet)");
-  console.log("3. Test contract interactions");
+  console.log("2. Verify contracts on block explorer");
+  console.log("3. Register validators for decentralized oracle");
+  console.log("4. Test cross-chain functionality");
 }
 
 main()
