@@ -51,7 +51,7 @@ export class ContractService {
   private lendingPool: ethers.Contract | null = null;
   private stablecoin: ethers.Contract | null = null;
   private oracle: ethers.Contract | null = null;
-  private readonly POLKADOT_HUB_CHAIN_ID = BigInt(420420420);
+  private readonly POLKADOT_HUB_CHAIN_ID = BigInt(420420417);
 
   constructor() {
     if (typeof window !== 'undefined' && window.ethereum) {
@@ -71,7 +71,7 @@ export class ContractService {
         `To add Polkadot Hub to your wallet:\n` +
         `- Network Name: Polkadot Hub\n` +
         `- RPC URL: ${process.env.NEXT_PUBLIC_RPC_URL || 'https://polkadot-hub-rpc.polkadot.io'}\n` +
-        `- Chain ID: 420420420\n` +
+        `- Chain ID: 420420417\n` +
         `- Currency Symbol: DOT`
       );
     }

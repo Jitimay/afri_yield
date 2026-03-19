@@ -49,7 +49,7 @@ AfriYield leverages Polkadot's unique features to solve complex agricultural fin
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │   Asset Hub     │    │   Polkadot Hub   │    │     Acala       │
-│   (ID: 1000)    │◄──►│   (ID: 420420420)│◄──►│   (ID: 2000)    │
+│   (ID: 1000)    │◄──►│   (ID: 420420417)│◄──►│   (ID: 2000)    │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
                               │
                     ┌─────────┼─────────┐
@@ -100,7 +100,7 @@ PRIVATE_KEY=your_private_key_here
 POLKADOT_HUB_RPC_URL=https://polkadot-hub-rpc.polkadot.io
 
 # Frontend .env
-NEXT_PUBLIC_CHAIN_ID=420420420
+NEXT_PUBLIC_CHAIN_ID=420420417
 NEXT_PUBLIC_RPC_URL=https://polkadot-hub-rpc.polkadot.io
 NEXT_PUBLIC_LENDING_POOL_ADDRESS=deployed_address
 NEXT_PUBLIC_ORACLE_ADDRESS=deployed_address
@@ -137,7 +137,7 @@ NEXT_PUBLIC_GOVERNANCE_ADDRESS=deployed_address
 ## 🔧 Network Configuration
 
 ### Polkadot Hub Testnet
-- **Chain ID**: 420420420
+- **Chain ID**: 420420417
 - **RPC URL**: https://polkadot-hub-rpc.polkadot.io
 - **Explorer**: https://polkadot-hub.subscan.io
 - **Faucet**: https://faucet.polkadot-hub.io
