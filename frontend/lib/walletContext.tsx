@@ -41,14 +41,14 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       
       // Check if we're on the correct network
       const network = await provider.getNetwork();
-      const expectedChainId = 420420420; // Polkadot Hub
+      const expectedChainId = 420420417; // Polkadot Hub (Paseo)
       
       if (network.chainId !== BigInt(expectedChainId)) {
-        // Try to switch to Polkadot Hub
+        // Try to switch to Polkadot Hub (Paseo)
         try {
           await window.ethereum.request({
             method: 'wallet_switchEthereumChain',
-            params: [{ chainId: '0x190F6E14' }], // 420420420 in hex
+            params: [{ chainId: '0x191B6D1' }], // 420420417 in hex
           });
         } catch (switchError: any) {
           // If network doesn't exist, add it
@@ -56,19 +56,19 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
             await window.ethereum.request({
               method: 'wallet_addEthereumChain',
               params: [{
-                chainId: '0x190F6E14',
-                chainName: 'Polkadot Hub',
+                chainId: '0x191B6D1',
+                chainName: 'Polkadot Hub (Paseo)',
                 nativeCurrency: {
-                  name: 'DOT',
-                  symbol: 'DOT',
+                  name: 'Paseo',
+                  symbol: 'PAS',
                   decimals: 18,
                 },
-                rpcUrls: ['https://polkadot-hub-rpc.polkadot.io'],
-                blockExplorerUrls: ['https://polkadot-hub.subscan.io'],
+                rpcUrls: ['https://eth-asset-hub-paseo.dotters.network'],
+                blockExplorerUrls: ['https://polkadot.testnet.routescan.io'],
               }],
             });
           } else {
-            throw new Error('Please switch to Polkadot Hub network');
+            throw new Error('Please switch to Polkadot Hub (Paseo) network');
           }
         }
       }

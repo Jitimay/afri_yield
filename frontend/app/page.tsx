@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import NetworkStatus from '@/components/NetworkStatus';
 
 export default function Home() {
   return (
@@ -9,7 +10,7 @@ export default function Home() {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16">
           <div className="text-center">
             <div className="inline-flex items-center px-4 py-2 rounded-full bg-emerald-100 text-emerald-800 text-sm font-medium mb-8">
-              🌍 Empowering East African Farmers
+              🌍 Empowering East African Farmers on Polkadot Hub
             </div>
             <h1 className="text-5xl md:text-7xl font-bold bg-gradient-to-r from-emerald-600 to-blue-600 bg-clip-text text-transparent mb-6">
               AfriYield
@@ -17,9 +18,14 @@ export default function Home() {
             <p className="text-xl md:text-2xl text-gray-600 mb-4 max-w-3xl mx-auto">
               AI-Powered Micro-Lending Platform
             </p>
-            <p className="text-lg text-gray-500 mb-12 max-w-2xl mx-auto">
-              Instant micro-loans for smallholder farmers through intelligent risk assessment on Polkadot
+            <p className="text-lg text-gray-500 mb-8 max-w-2xl mx-auto">
+              Instant micro-loans for smallholder farmers through intelligent risk assessment on Polkadot Hub (Paseo)
             </p>
+            
+            {/* Network Status */}
+            <div className="max-w-md mx-auto mb-8">
+              <NetworkStatus />
+            </div>
             
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
@@ -115,7 +121,7 @@ export default function Home() {
               "Instant loan approval",
               "Fixed 8% APY for lenders", 
               "Complete on-chain transparency",
-              "Moonbase Alpha integration",
+              "Polkadot Hub (Paseo) integration",
               "Secure smart contracts"
             ].map((feature, index) => (
               <div key={index} className="flex items-center space-x-3">
@@ -133,7 +139,7 @@ export default function Home() {
       <footer className="bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <p className="text-gray-500">
-            Testnet Demo • Moonbase Alpha • Built with ❤️ for East African farmers
+            Testnet Demo • Polkadot Hub (Paseo) • Built with ❤️ for East African farmers
           </p>
         </div>
       </footer>

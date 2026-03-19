@@ -31,7 +31,7 @@ export default function WalletConnect() {
         <div className="hidden md:block bg-gray-50 rounded-xl px-4 py-2">
           <div className="text-xs text-gray-500 mb-1">Balances</div>
           <div className="font-mono text-sm">
-            <span className="text-blue-600 font-semibold">{wallet.balance.native} DEV</span>
+            <span className="text-blue-600 font-semibold">{wallet.balance.native} PAS</span>
             <span className="mx-2 text-gray-400">|</span>
             <span className="text-emerald-600 font-semibold">{wallet.balance.ausd} AUSD</span>
           </div>
