@@ -56,7 +56,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
             await window.ethereum.request({
               method: 'wallet_addEthereumChain',
               params: [{
-                chainId: '0x191B6D1',
+                chainId: '0x190F1B41', // Correct hex for 420420417
                 chainName: 'Polkadot Hub (Paseo)',
                 nativeCurrency: {
                   name: 'Paseo',
