@@ -28,6 +28,7 @@ contract AfriYieldLendingPool is ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
 
     IERC20 public stablecoin;
+    IERC20 public pasToken;
     IDecentralizedOracle public oracle;
     IRiskCalculator public riskCalculator;
     address public xcmBridge;
@@ -39,11 +40,11 @@ contract AfriYieldLendingPool is ReentrancyGuard, Ownable {
     uint256 public loanCounter;
     uint256 public insurancePool;
     uint256 public constant INSURANCE_RATE = 5;
-    uint256 public dotRewardsPool;
+    uint256 public pasRewardsPool;
 
-    // DOT collateral
-    mapping(address => uint256) public dotCollateral;
-    mapping(address => uint256) public dotRewards;
+    // PAS collateral
+    mapping(address => uint256) public pasCollateral;
+    mapping(address => uint256) public pasRewards;
 
     struct Loan {
         address borrower;
@@ -67,14 +68,15 @@ contract AfriYieldLendingPool is ReentrancyGuard, Ownable {
     event LoanRequested(uint256 indexed loanId, address indexed borrower, uint256 amount, uint256 riskScore);
     event LoanApproved(uint256 indexed loanId, address indexed borrower, uint256 amount);
     event LoanRepaid(uint256 indexed loanId, address indexed borrower, uint256 amount);
-    event DOTCollateralDeposited(address indexed borrower, uint256 amount);
+    event PASCollateralDeposited(address indexed borrower, uint256 amount);
     event CollateralLiquidated(address indexed borrower, uint256 loanId, uint256 amount);
-    event DOTRewardsDistributed(address indexed lender, uint256 amount);
+    event PASRewardsDistributed(address indexed lender, uint256 amount);
     event YieldAccrued(address indexed lender, uint256 amount);
     event FundsWithdrawn(address indexed lender, uint256 amount);
 
-    constructor(address _stablecoin, address _oracle, address _riskCalculator) Ownable(msg.sender) {
+    constructor(address _stablecoin, address _pasToken, address _oracle, address _riskCalculator) Ownable(msg.sender) {
         stablecoin = IERC20(_stablecoin);
+        pasToken = IERC20(_pasToken);
         oracle = IDecentralizedOracle(_oracle);
         riskCalculator = IRiskCalculator(_riskCalculator);
     }
@@ -109,12 +111,13 @@ contract AfriYieldLendingPool is ReentrancyGuard, Ownable {
         emit CrossChainDepositCredited(lender, netDeposit);
     }
 
-    function depositDOTCollateral() external payable {
-        require(msg.value > 0, "Must deposit DOT");
+    function depositPASCollateral(uint256 amount) external nonReentrant {
+        require(amount > 0, "Must deposit PAS");
         
-        dotCollateral[msg.sender] += msg.value;
+        pasToken.safeTransferFrom(msg.sender, address(this), amount);
+        pasCollateral[msg.sender] += amount;
         
-        emit DOTCollateralDeposited(msg.sender, msg.value);
+        emit PASCollateralDeposited(msg.sender, amount);
     }
 
     function requestLoan(uint256 amount, uint256 riskScore) external nonReentrant {
@@ -126,11 +129,11 @@ contract AfriYieldLendingPool is ReentrancyGuard, Ownable {
         uint256 oracleScore = oracle.getRiskScore(msg.sender);
         uint256 finalScore = oracleScore > 0 ? oracleScore : riskScore;
         
-        // Check DOT collateral if provided
-        uint256 collateralValue = dotCollateral[msg.sender] * getDOTPrice() / 1e18;
+        // Check PAS collateral if provided
+        uint256 collateralValue = pasCollateral[msg.sender] * getPASPrice() / 1e18;
         uint256 maxLoanWithCollateral = (collateralValue * 70) / 100; // 70% LTV
         
-        if (dotCollateral[msg.sender] > 0) {
+        if (pasCollateral[msg.sender] > 0) {
             require(amount <= maxLoanWithCollateral, "Insufficient collateral");
         }
         
@@ -145,7 +148,7 @@ contract AfriYieldLendingPool is ReentrancyGuard, Ownable {
             dueDate: block.timestamp + 90 days,
             isActive: true,
             isRepaid: false,
-            collateralAmount: dotCollateral[msg.sender]
+            collateralAmount: pasCollateral[msg.sender]
         });
         
         borrowerLoans[msg.sender].push(loanId);
@@ -183,7 +186,7 @@ contract AfriYieldLendingPool is ReentrancyGuard, Ownable {
             dueDate: block.timestamp + 90 days,
             isActive: true,
             isRepaid: false,
-            collateralAmount: dotCollateral[msg.sender]
+            collateralAmount: pasCollateral[msg.sender]
         });
         
         borrowerLoans[msg.sender].push(loanId);
@@ -208,11 +211,11 @@ contract AfriYieldLendingPool is ReentrancyGuard, Ownable {
         loan.isRepaid = true;
         totalLoans -= loan.amount;
         
-        // Return DOT collateral if any
+        // Return PAS collateral if any
         if (loan.collateralAmount > 0) {
-            uint256 collateralToReturn = dotCollateral[msg.sender];
-            dotCollateral[msg.sender] = 0;
-            payable(msg.sender).transfer(collateralToReturn);
+            uint256 collateralToReturn = pasCollateral[msg.sender];
+            pasCollateral[msg.sender] = 0;
+            pasToken.safeTransfer(msg.sender, collateralToReturn);
         }
         
         emit LoanRepaid(loanId, msg.sender, loan.amount);
@@ -223,14 +226,14 @@ contract AfriYieldLendingPool is ReentrancyGuard, Ownable {
         require(loan.isActive, "Loan not active");
         require(block.timestamp > loan.dueDate, "Loan not overdue");
         
-        uint256 collateralValue = loan.collateralAmount * getDOTPrice() / 1e18;
+        uint256 collateralValue = loan.collateralAmount * getPASPrice() / 1e18;
         uint256 requiredValue = (loan.amount * 70) / 100;
         
         require(collateralValue < requiredValue, "Collateral sufficient");
         
-        // Transfer DOT to pool
-        dotRewardsPool += loan.collateralAmount;
-        dotCollateral[loan.borrower] = 0;
+        // Transfer PAS to pool
+        pasRewardsPool += loan.collateralAmount;
+        pasCollateral[loan.borrower] = 0;
         
         loan.isActive = false;
         totalLoans -= loan.amount;
@@ -248,12 +251,12 @@ contract AfriYieldLendingPool is ReentrancyGuard, Ownable {
         return yield;
     }
 
-    function calculateDOTRewards(address lender) public view returns (uint256) {
+    function calculatePASRewards(address lender) public view returns (uint256) {
         uint256 deposit = lenderDeposits[lender];
-        if (deposit == 0 || dotRewardsPool == 0) return 0;
+        if (deposit == 0 || pasRewardsPool == 0) return 0;
         
         uint256 timeElapsed = block.timestamp - depositTimestamp[lender];
-        uint256 rewards = (deposit * dotRewardsPool * timeElapsed) / (totalDeposits * 30 days);
+        uint256 rewards = (deposit * pasRewardsPool * timeElapsed) / (totalDeposits * 30 days);
         
         return rewards;
     }
@@ -272,13 +275,13 @@ contract AfriYieldLendingPool is ReentrancyGuard, Ownable {
             emit YieldAccrued(msg.sender, yield);
         }
         
-        // Calculate and distribute DOT rewards
-        uint256 dotReward = calculateDOTRewards(msg.sender);
-        if (dotReward > 0 && dotRewardsPool >= dotReward) {
-            dotRewards[msg.sender] += dotReward;
-            dotRewardsPool -= dotReward;
-            payable(msg.sender).transfer(dotReward);
-            emit DOTRewardsDistributed(msg.sender, dotReward);
+        // Calculate and distribute PAS rewards
+        uint256 pasReward = calculatePASRewards(msg.sender);
+        if (pasReward > 0 && pasRewardsPool >= pasReward) {
+            pasRewards[msg.sender] += pasReward;
+            pasRewardsPool -= pasReward;
+            pasToken.safeTransfer(msg.sender, pasReward);
+            emit PASRewardsDistributed(msg.sender, pasReward);
         }
         
         if (amount <= lenderDeposits[msg.sender]) {
@@ -297,22 +300,23 @@ contract AfriYieldLendingPool is ReentrancyGuard, Ownable {
         emit FundsWithdrawn(msg.sender, amount);
     }
 
-    function claimDOTRewards() external nonReentrant {
-        uint256 rewards = dotRewards[msg.sender];
+    function claimPASRewards() external nonReentrant {
+        uint256 rewards = pasRewards[msg.sender];
         require(rewards > 0, "No rewards to claim");
         
-        dotRewards[msg.sender] = 0;
-        payable(msg.sender).transfer(rewards);
+        pasRewards[msg.sender] = 0;
+        pasToken.safeTransfer(msg.sender, rewards);
         
-        emit DOTRewardsDistributed(msg.sender, rewards);
+        emit PASRewardsDistributed(msg.sender, rewards);
     }
 
-    function fundDOTRewardsPool() external payable onlyOwner {
-        dotRewardsPool += msg.value;
+    function fundPASRewardsPool(uint256 amount) external onlyOwner {
+        pasToken.safeTransferFrom(msg.sender, address(this), amount);
+        pasRewardsPool += amount;
     }
 
-    function getDOTPrice() public pure returns (uint256) {
-        return 5 * 1e18; // $5 per DOT (simplified)
+    function getPASPrice() public pure returns (uint256) {
+        return 5 * 1e18; // $5 per PAS (simplified)
     }
 
     function setXCMBridge(address _xcmBridge) external onlyOwner {

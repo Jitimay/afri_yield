@@ -3,6 +3,8 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 interface ILendingPool {
     function setAPY(uint256 newAPY) external;
@@ -11,6 +13,9 @@ interface ILendingPool {
 }
 
 contract AfriYieldGovernance is Ownable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
+    
+    IERC20 public pasToken;
     struct Proposal {
         uint256 id;
         address proposer;
@@ -28,9 +33,9 @@ contract AfriYieldGovernance is Ownable, ReentrancyGuard {
     
     mapping(uint256 => Proposal) public proposals;
     mapping(uint256 => mapping(address => bool)) public hasVoted;
-    mapping(address => uint256) public stakedDOT;
+    mapping(address => uint256) public stakedPAS;
     mapping(address => uint256) public votingPower;
-    mapping(address => uint256) public unbondingDOT;
+    mapping(address => uint256) public unbondingPAS;
     mapping(address => uint256) public unbondingDeadline;
     
     uint256 public proposalCount;
@@ -47,40 +52,42 @@ contract AfriYieldGovernance is Ownable, ReentrancyGuard {
     event StakeUpdated(address user, uint256 amount);
     event UnbondingStarted(address user, uint256 amount, uint256 deadline);
     
-    constructor(address _lendingPool) Ownable(msg.sender) {
+    constructor(address _pasToken, address _lendingPool) Ownable(msg.sender) {
+        pasToken = IERC20(_pasToken);
         lendingPool = ILendingPool(_lendingPool);
     }
     
-    function stakeDOT() external payable {
-        require(msg.value > 0, "Must stake DOT");
+    function stakePAS(uint256 amount) external {
+        require(amount > 0, "Must stake PAS");
         
-        stakedDOT[msg.sender] += msg.value;
-        votingPower[msg.sender] = stakedDOT[msg.sender]; // 1:1 ratio
+        pasToken.safeTransferFrom(msg.sender, address(this), amount);
+        stakedPAS[msg.sender] += amount;
+        votingPower[msg.sender] = stakedPAS[msg.sender]; // 1:1 ratio
         
-        emit StakeUpdated(msg.sender, stakedDOT[msg.sender]);
+        emit StakeUpdated(msg.sender, stakedPAS[msg.sender]);
     }
     
-    function unstakeDOT(uint256 amount) external {
-        require(stakedDOT[msg.sender] >= amount, "Insufficient staked DOT");
+    function unstakePAS(uint256 amount) external {
+        require(stakedPAS[msg.sender] >= amount, "Insufficient staked PAS");
         
-        stakedDOT[msg.sender] -= amount;
-        votingPower[msg.sender] = stakedDOT[msg.sender];
+        stakedPAS[msg.sender] -= amount;
+        votingPower[msg.sender] = stakedPAS[msg.sender];
         
-        unbondingDOT[msg.sender] += amount;
+        unbondingPAS[msg.sender] += amount;
         unbondingDeadline[msg.sender] = block.timestamp + UNBONDING_PERIOD;
         
         emit UnbondingStarted(msg.sender, amount, unbondingDeadline[msg.sender]);
     }
     
-    function withdrawUnbondedDOT() external nonReentrant {
-        require(unbondingDOT[msg.sender] > 0, "No unbonding DOT");
+    function withdrawUnbondedPAS() external nonReentrant {
+        require(unbondingPAS[msg.sender] > 0, "No unbonding PAS");
         require(block.timestamp >= unbondingDeadline[msg.sender], "Still unbonding");
         
-        uint256 amount = unbondingDOT[msg.sender];
-        unbondingDOT[msg.sender] = 0;
+        uint256 amount = unbondingPAS[msg.sender];
+        unbondingPAS[msg.sender] = 0;
         unbondingDeadline[msg.sender] = 0;
         
-        payable(msg.sender).transfer(amount);
+        pasToken.safeTransfer(msg.sender, amount);
     }
     
     function createProposal(
@@ -115,7 +122,7 @@ contract AfriYieldGovernance is Ownable, ReentrancyGuard {
         require(votingPower[msg.sender] > 0, "No voting power");
         require(!hasVoted[proposalId][msg.sender], "Already voted");
         require(block.timestamp < proposals[proposalId].votingDeadline, "Voting ended");
-        require(unbondingDOT[msg.sender] == 0, "Cannot vote while unbonding");
+        require(unbondingPAS[msg.sender] == 0, "Cannot vote while unbonding");
         
         hasVoted[proposalId][msg.sender] = true;
         uint256 power = votingPower[msg.sender];

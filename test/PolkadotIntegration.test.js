@@ -2,18 +2,21 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
 describe("AfriYield Polkadot Hub Integration", function () {
-  let stablecoin, oracle, riskCalculator, lendingPool, xcmBridge, governance;
+  let stablecoin, pasToken, oracle, riskCalculator, lendingPool, xcmBridge, governance;
   let owner, farmer, lender, validator1, validator2, validator3;
 
   beforeEach(async function () {
     [owner, farmer, lender, validator1, validator2, validator3] = await ethers.getSigners();
 
     // Deploy contracts
+    const PASToken = await ethers.getContractFactory("PASToken");
+    pasToken = await PASToken.deploy();
+
     const MockStablecoin = await ethers.getContractFactory("MockStablecoin");
     stablecoin = await MockStablecoin.deploy();
 
     const DecentralizedOracle = await ethers.getContractFactory("DecentralizedOracle");
-    oracle = await DecentralizedOracle.deploy();
+    oracle = await DecentralizedOracle.deploy(await pasToken.getAddress());
 
     const RiskCalculator = await ethers.getContractFactory("RiskCalculator");
     riskCalculator = await RiskCalculator.deploy();
@@ -21,6 +24,7 @@ describe("AfriYield Polkadot Hub Integration", function () {
     const AfriYieldLendingPool = await ethers.getContractFactory("AfriYieldLendingPool");
     lendingPool = await AfriYieldLendingPool.deploy(
       await stablecoin.getAddress(),
+      await pasToken.getAddress(),
       await oracle.getAddress(),
       await riskCalculator.getAddress()
     );
@@ -29,7 +33,10 @@ describe("AfriYield Polkadot Hub Integration", function () {
     xcmBridge = await XCMBridge.deploy(await lendingPool.getAddress());
 
     const AfriYieldGovernance = await ethers.getContractFactory("AfriYieldGovernance");
-    governance = await AfriYieldGovernance.deploy(await lendingPool.getAddress());
+    governance = await AfriYieldGovernance.deploy(
+      await pasToken.getAddress(),
+      await lendingPool.getAddress()
+    );
 
     // Set up connections
     await lendingPool.setXCMBridge(await xcmBridge.getAddress());
@@ -37,13 +44,19 @@ describe("AfriYield Polkadot Hub Integration", function () {
     // Mint tokens for testing
     await stablecoin.mint(lender.address, ethers.parseEther("10000"));
     await stablecoin.mint(farmer.address, ethers.parseEther("1000"));
+    await pasToken.mint(validator1.address, ethers.parseEther("1000"));
+    await pasToken.mint(validator2.address, ethers.parseEther("1000"));
+    await pasToken.mint(validator3.address, ethers.parseEther("1000"));
+    await pasToken.mint(farmer.address, ethers.parseEther("500"));
+    await pasToken.mint(lender.address, ethers.parseEther("500"));
   });
 
   describe("Decentralized Oracle", function () {
-    it("Should allow validator registration with DOT stake", async function () {
+    it("Should allow validator registration with PAS stake", async function () {
       const stakeAmount = ethers.parseEther("100");
       
-      await oracle.connect(validator1).registerValidator({ value: stakeAmount });
+      await pasToken.connect(validator1).approve(await oracle.getAddress(), stakeAmount);
+      await oracle.connect(validator1).registerValidator(stakeAmount);
       
       const validator = await oracle.validators(validator1.address);
       expect(validator.stake).to.equal(stakeAmount);
@@ -54,9 +67,13 @@ describe("AfriYield Polkadot Hub Integration", function () {
       const stakeAmount = ethers.parseEther("100");
       
       // Register validators
-      await oracle.connect(validator1).registerValidator({ value: stakeAmount });
-      await oracle.connect(validator2).registerValidator({ value: stakeAmount });
-      await oracle.connect(validator3).registerValidator({ value: stakeAmount });
+      await pasToken.connect(validator1).approve(await oracle.getAddress(), stakeAmount);
+      await pasToken.connect(validator2).approve(await oracle.getAddress(), stakeAmount);
+      await pasToken.connect(validator3).approve(await oracle.getAddress(), stakeAmount);
+      
+      await oracle.connect(validator1).registerValidator(stakeAmount);
+      await oracle.connect(validator2).registerValidator(stakeAmount);
+      await oracle.connect(validator3).registerValidator(stakeAmount);
 
       // Submit risk scores
       await oracle.connect(validator1).submitRiskScore(farmer.address, 80);
@@ -70,9 +87,13 @@ describe("AfriYield Polkadot Hub Integration", function () {
     it("Should distribute rewards after consensus", async function () {
       const stakeAmount = ethers.parseEther("100");
       
-      await oracle.connect(validator1).registerValidator({ value: stakeAmount });
-      await oracle.connect(validator2).registerValidator({ value: stakeAmount });
-      await oracle.connect(validator3).registerValidator({ value: stakeAmount });
+      await pasToken.connect(validator1).approve(await oracle.getAddress(), stakeAmount);
+      await pasToken.connect(validator2).approve(await oracle.getAddress(), stakeAmount);
+      await pasToken.connect(validator3).approve(await oracle.getAddress(), stakeAmount);
+      
+      await oracle.connect(validator1).registerValidator(stakeAmount);
+      await oracle.connect(validator2).registerValidator(stakeAmount);
+      await oracle.connect(validator3).registerValidator(stakeAmount);
 
       await oracle.connect(validator1).submitRiskScore(farmer.address, 80);
       await oracle.connect(validator2).submitRiskScore(farmer.address, 85);
@@ -130,14 +151,15 @@ describe("AfriYield Polkadot Hub Integration", function () {
   });
 
   describe("Enhanced Lending Pool", function () {
-    it("Should accept DOT collateral for loans", async function () {
-      const collateralAmount = ethers.parseEther("10"); // 10 DOT
+    it("Should accept PAS collateral for loans", async function () {
+      const collateralAmount = ethers.parseEther("10"); // 10 PAS
       const loanAmount = ethers.parseEther("200"); // $200 loan
 
       // Deposit collateral
-      await lendingPool.connect(farmer).depositDOTCollateral({ value: collateralAmount });
+      await pasToken.connect(farmer).approve(await lendingPool.getAddress(), collateralAmount);
+      await lendingPool.connect(farmer).depositPASCollateral(collateralAmount);
       
-      expect(await lendingPool.dotCollateral(farmer.address)).to.equal(collateralAmount);
+      expect(await lendingPool.pasCollateral(farmer.address)).to.equal(collateralAmount);
     });
 
     it("Should request loan with farm data", async function () {
@@ -215,18 +237,20 @@ describe("AfriYield Polkadot Hub Integration", function () {
   });
 
   describe("Governance", function () {
-    it("Should allow DOT staking for voting power", async function () {
+    it("Should allow PAS staking for voting power", async function () {
       const stakeAmount = ethers.parseEther("50");
       
-      await governance.connect(lender).stakeDOT({ value: stakeAmount });
+      await pasToken.connect(lender).approve(await governance.getAddress(), stakeAmount);
+      await governance.connect(lender).stakePAS(stakeAmount);
       
-      expect(await governance.stakedDOT(lender.address)).to.equal(stakeAmount);
+      expect(await governance.stakedPAS(lender.address)).to.equal(stakeAmount);
       expect(await governance.votingPower(lender.address)).to.equal(stakeAmount);
     });
 
     it("Should create and vote on proposals", async function () {
       const stakeAmount = ethers.parseEther("50");
-      await governance.connect(lender).stakeDOT({ value: stakeAmount });
+      await pasToken.connect(lender).approve(await governance.getAddress(), stakeAmount);
+      await governance.connect(lender).stakePAS(stakeAmount);
 
       await governance.connect(lender).createProposal(
         "APY",
@@ -243,12 +267,13 @@ describe("AfriYield Polkadot Hub Integration", function () {
 
     it("Should enforce unbonding period", async function () {
       const stakeAmount = ethers.parseEther("50");
-      await governance.connect(lender).stakeDOT({ value: stakeAmount });
+      await pasToken.connect(lender).approve(await governance.getAddress(), stakeAmount);
+      await governance.connect(lender).stakePAS(stakeAmount);
 
-      await governance.connect(lender).unstakeDOT(stakeAmount);
+      await governance.connect(lender).unstakePAS(stakeAmount);
 
       await expect(
-        governance.connect(lender).withdrawUnbondedDOT()
+        governance.connect(lender).withdrawUnbondedPAS()
       ).to.be.revertedWith("Still unbonding");
     });
   });
@@ -257,9 +282,13 @@ describe("AfriYield Polkadot Hub Integration", function () {
     it("Should complete full farmer journey with oracle consensus", async function () {
       // 1. Register validators
       const stakeAmount = ethers.parseEther("100");
-      await oracle.connect(validator1).registerValidator({ value: stakeAmount });
-      await oracle.connect(validator2).registerValidator({ value: stakeAmount });
-      await oracle.connect(validator3).registerValidator({ value: stakeAmount });
+      await pasToken.connect(validator1).approve(await oracle.getAddress(), stakeAmount);
+      await pasToken.connect(validator2).approve(await oracle.getAddress(), stakeAmount);
+      await pasToken.connect(validator3).approve(await oracle.getAddress(), stakeAmount);
+      
+      await oracle.connect(validator1).registerValidator(stakeAmount);
+      await oracle.connect(validator2).registerValidator(stakeAmount);
+      await oracle.connect(validator3).registerValidator(stakeAmount);
 
       // 2. Lender deposits funds
       const depositAmount = ethers.parseEther("1000");

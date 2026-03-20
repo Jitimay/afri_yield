@@ -3,8 +3,13 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract DecentralizedOracle is Ownable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
+    
+    IERC20 public pasToken;
     struct Validator {
         uint256 stake;
         uint256 rewards;
@@ -32,21 +37,25 @@ contract DecentralizedOracle is Ownable, ReentrancyGuard {
     event ValidatorSlashed(address validator, uint256 amount);
     event UnbondingStarted(address validator, uint256 amount, uint256 deadline);
     
-    constructor() Ownable(msg.sender) {}
+    constructor(address _pasToken) Ownable(msg.sender) {
+        pasToken = IERC20(_pasToken);
+    }
     
-    function registerValidator() external payable {
-        require(msg.value >= MIN_STAKE, "Insufficient stake");
+    function registerValidator(uint256 stakeAmount) external {
+        require(stakeAmount >= MIN_STAKE, "Insufficient stake");
         require(!validators[msg.sender].isActive, "Already registered");
         
+        pasToken.safeTransferFrom(msg.sender, address(this), stakeAmount);
+        
         validators[msg.sender] = Validator({
-            stake: msg.value,
+            stake: stakeAmount,
             rewards: 0,
             outlierCount: 0,
             registrationTime: block.timestamp,
             isActive: true
         });
         
-        emit ValidatorRegistered(msg.sender, msg.value);
+        emit ValidatorRegistered(msg.sender, stakeAmount);
     }
     
     function unregisterValidator() external {
@@ -68,7 +77,7 @@ contract DecentralizedOracle is Ownable, ReentrancyGuard {
         unbondingAmount[msg.sender] = 0;
         unbondingDeadline[msg.sender] = 0;
         
-        payable(msg.sender).transfer(amount);
+        pasToken.safeTransfer(msg.sender, amount);
     }
     
     function submitRiskScore(address farmer, uint256 score) external {
@@ -140,7 +149,7 @@ contract DecentralizedOracle is Ownable, ReentrancyGuard {
         require(rewards > 0, "No rewards");
         
         validators[msg.sender].rewards = 0;
-        payable(msg.sender).transfer(rewards);
+        pasToken.safeTransfer(msg.sender, rewards);
     }
     
     function _calculateMedian(uint256[] memory scores) internal pure returns (uint256) {
