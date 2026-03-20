@@ -227,9 +227,12 @@ export class ContractService {
 // Singleton instance
 let contractServiceInstance: ContractService | null = null;
 
-export function getContractService(): ContractService {
+export const getContractService = (): ContractService => {
   if (!contractServiceInstance) {
     contractServiceInstance = new ContractService();
   }
   return contractServiceInstance;
-}
+};
+
+// Default export
+export default getContractService;
